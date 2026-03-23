@@ -1,0 +1,2 @@
+# ccarchitecture
+Claude Code Architecture
