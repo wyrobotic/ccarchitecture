@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Project Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    padding: 48px;
+    min-height: 100vh;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #f8fafc;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 48px;
+  }
+
+  .diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* ── Section titles ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #475569;
+    margin-bottom: 12px;
+  }
+
+  /* ── Upstream row ── */
+  .upstream-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+  }
+  .upstream-box {
+    background: #1a1d2e;
+    border: 1px solid #2d3148;
+    border-radius: 12px;
+    padding: 16px 24px;
+    text-align: center;
+    flex: 1;
+    max-width: 220px;
+    position: relative;
+  }
+  .upstream-box .icon { font-size: 20px; margin-bottom: 6px; }
+  .upstream-box .name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c4b5fd;
+  }
+  .upstream-box .desc {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+  .upstream-box .tag {
+    display: inline-block;
+    font-size: 10px;
+    background: #312e81;
+    color: #a5b4fc;
+    padding: 2px 8px;
+    border-radius: 99px;
+    margin-top: 8px;
+  }
+
+  /* ── Flow arrows ── */
+  .flow-arrow {
+    text-align: center;
+    color: #475569;
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 0;
+  }
+  .flow-label {
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+    margin-top: -2px;
+  }
+
+  /* ── Shared skills box ── */
+  .shared-skills {
+    background: linear-gradient(135deg, #1e293b 0%, #1a2332 100%);
+    border: 1.5px solid #334155;
+    border-radius: 16px;
+    padding: 28px 32px;
+    position: relative;
+  }
+  .shared-skills::before {
+    content: "SINGLE SOURCE OF TRUTH";
+    position: absolute;
+    top: -10px;
+    left: 24px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #22d3ee;
+    background: #0f1117;
+    padding: 0 10px;
+  }
+  .shared-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .shared-title .path {
+    font-size: 12px;
+    font-weight: 400;
+    color: #475569;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .shared-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .shared-category {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .shared-category .cat-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  .cat-agents .cat-title { color: #f59e0b; }
+  .cat-skills .cat-title { color: #22d3ee; }
+  .cat-design .cat-title { color: #a78bfa; }
+  .cat-workflow .cat-title { color: #34d399; }
+
+  .item-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .item {
+    font-size: 11px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: #1e293b;
+    color: #94a3b8;
+  }
+  .cat-agents .item { border-left: 2px solid #f59e0b; }
+  .cat-skills .item { border-left: 2px solid #22d3ee; }
+  .cat-design .item { border-left: 2px solid #a78bfa; }
+  .cat-workflow .item { border-left: 2px solid #34d399; }
+
+  /* ── Symlink connectors ── */
+  .symlink-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #475569;
+  }
+  .symlink-line {
+    flex: 1;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, #334155 0px, #334155 6px, transparent 6px, transparent 12px);
+  }
+  .symlink-label {
+    font-size: 11px;
+    color: #22d3ee;
+    font-weight: 600;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ── Projects row ── */
+  .projects-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .project-card {
+    background: #1a1d2e;
+    border: 1px solid #2d3148;
+    border-radius: 12px;
+    padding: 16px 20px;
+    min-width: 150px;
+    text-align: center;
+    position: relative;
+  }
+  .project-card.starter {
+    border-color: #22d3ee;
+    background: #0c1e2e;
+  }
+  .project-card .proj-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+  .project-card .proj-type {
+    font-size: 10px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+  .project-card .proj-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    margin-bottom: 8px;
+  }
+  .project-card.starter .proj-badge {
+    background: #164e63;
+    color: #22d3ee;
+  }
+  .project-card:not(.starter) .proj-badge {
+    background: #1e293b;
+    color: #64748b;
+  }
+
+  /* ── Per-project section ── */
+  .per-project {
+    background: #1a1d2e;
+    border: 1px solid #2d3148;
+    border-radius: 12px;
+    padding: 20px 24px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .per-project .pp-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 10px;
+  }
+  .pp-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pp-item {
+    font-size: 11px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    padding: 4px 12px;
+    border-radius: 6px;
+    background: #0f172a;
+    color: #64748b;
+    border-left: 2px solid #475569;
+  }
+
+  /* ── Workflow section ── */
+  .workflow-section {
+    margin-top: 16px;
+    padding-top: 40px;
+    border-top: 1px solid #1e293b;
+  }
+  .workflow-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+
+  .workflow-paths {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .wf-path {
+    background: #1a1d2e;
+    border: 1px solid #2d3148;
+    border-radius: 14px;
+    padding: 24px;
+  }
+  .wf-path.primary { border-color: #22d3ee; }
+  .wf-path.secondary { border-color: #475569; }
+
+  .wf-path-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 16px;
+  }
+  .wf-path.primary .wf-path-label { color: #22d3ee; }
+  .wf-path.secondary .wf-path-label { color: #64748b; }
+
+  .wf-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .wf-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .wf-step-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    min-width: 20px;
+    text-align: right;
+    padding-top: 1px;
+  }
+  .wf-step-text { color: #cbd5e1; }
+  .wf-step-text em {
+    font-style: normal;
+    color: #a78bfa;
+  }
+  .wf-step-text strong {
+    color: #f8fafc;
+    font-weight: 600;
+  }
+  .wf-step-note {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .wf-arrow-step {
+    font-size: 14px;
+    color: #334155;
+    margin: 2px 0;
+    text-align: center;
+  }
+
+  .wf-divider {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #334155;
+    font-size: 12px;
+    gap: 8px;
+    padding-top: 40px;
+  }
+  .wf-divider-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #475569;
+  }
+
+  /* ── Key principle callout ── */
+  .principle {
+    background: #1c1917;
+    border: 1px solid #44403c;
+    border-left: 3px solid #f59e0b;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+  }
+  .principle-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #f59e0b;
+    margin-bottom: 6px;
+  }
+  .principle-text {
+    font-size: 13px;
+    color: #a8a29e;
+    line-height: 1.6;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 48px;
+    font-size: 11px;
+    color: #334155;
+  }
+</style>
+</head>
+<body>
+
+<h1>Claude Code Project Architecture</h1>
+<p class="subtitle">Shared skills + symlinked agents · Upstream-tracked · Design-aware PACT workflow</p>
+
+<div class="diagram">
+
+  <!-- UPSTREAM SOURCES -->
+  <div>
+    <div class="section-label">Upstream GitHub Repositories (Local Clones)</div>
+    <div class="upstream-row">
+      <div class="upstream-box">
+        <div class="icon">🎨</div>
+        <div class="name">ui-ux-pro-max</div>
+        <div class="desc">Design intelligence, palettes, fonts, UX patterns</div>
+        <div class="tag">Community-maintained</div>
+      </div>
+      <div class="upstream-box">
+        <div class="icon">⚙️</div>
+        <div class="name">PACT Framework</div>
+        <div class="desc">Agent definitions, workflow phases, commands</div>
+        <div class="tag">Community-maintained</div>
+      </div>
+      <div class="upstream-box">
+        <div class="icon">📋</div>
+        <div class="name">BMAD</div>
+        <div class="desc">Planning framework, output templates</div>
+        <div class="tag">Community-maintained</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOW ARROW -->
+  <div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-label">/check-updates · selective integration · tracked via upstream-sources.json</div>
+  </div>
+
+  <!-- SHARED SKILLS -->
+  <div class="shared-skills">
+    <div class="shared-title">
+      shared-skills/
+      <span class="path">ClaudeCode_Projects/shared-skills/</span>
+    </div>
+    <div class="shared-grid">
+      <div class="shared-category cat-agents">
+        <div class="cat-title">Agents (8)</div>
+        <div class="item-list">
+          <span class="item">pact-architect</span>
+          <span class="item">pact-frontend-designer</span>
+          <span class="item">pact-frontend-coder</span>
+          <span class="item">pact-backend-coder</span>
+          <span class="item">pact-database-engineer</span>
+          <span class="item">pact-preparer</span>
+          <span class="item">pact-test-engineer</span>
+          <span class="item">pact-mobile-platform</span>
+        </div>
+      </div>
+      <div class="shared-category cat-skills">
+        <div class="cat-title">Design Intelligence</div>
+        <div class="item-list">
+          <span class="item">ui-ux-pro-max</span>
+          <span class="item">161 palettes</span>
+          <span class="item">1924 fonts</span>
+          <span class="item">13 tech stacks</span>
+          <span class="item">161 product types</span>
+        </div>
+      </div>
+      <div class="shared-category cat-design">
+        <div class="cat-title">Design System & Styling</div>
+        <div class="item-list">
+          <span class="item">design-system</span>
+          <span class="item">token architecture</span>
+          <span class="item">ui-styling</span>
+          <span class="item">shadcn refs</span>
+          <span class="item">Tailwind refs</span>
+        </div>
+      </div>
+      <div class="shared-category cat-workflow">
+        <div class="cat-title">Workflow</div>
+        <div class="item-list">
+          <span class="item">pact-memory.md</span>
+          <span class="item">pact-workflow.md</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYMLINK CONNECTORS -->
+  <div class="symlink-row">
+    <div class="symlink-line"></div>
+    <div class="symlink-label">⟡ symlinked → edit once, updates everywhere</div>
+    <div class="symlink-line"></div>
+  </div>
+
+  <!-- PROJECTS -->
+  <div>
+    <div class="section-label">Projects</div>
+    <div class="projects-row">
+      <div class="project-card starter">
+        <div class="proj-badge">Template</div>
+        <div class="proj-name">Forge</div>
+        <div class="proj-type">Starter project for new apps</div>
+      </div>
+      <div class="project-card">
+        <div class="proj-badge">Active</div>
+        <div class="proj-name">Nervio</div>
+        <div class="proj-type">AI content platform</div>
+      </div>
+      <div class="project-card">
+        <div class="proj-badge">Active</div>
+        <div class="proj-name">RevX</div>
+        <div class="proj-type">Website</div>
+      </div>
+      <div class="project-card">
+        <div class="proj-badge">Active</div>
+        <div class="proj-name">OlloScore</div>
+        <div class="proj-type">Scoring system</div>
+      </div>
+      <div class="project-card">
+        <div class="proj-badge">Active</div>
+        <div class="proj-name">Muse</div>
+        <div class="proj-type">Creative tool</div>
+      </div>
+      <div class="project-card">
+        <div class="proj-badge">Active</div>
+        <div class="proj-name">ProjectOps</div>
+        <div class="proj-type">Operations tool</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PER-PROJECT -->
+  <div class="per-project">
+    <div class="pp-title">Per-Project (copied from starter, can diverge)</div>
+    <div class="pp-items">
+      <span class="pp-item">CLAUDE.md</span>
+      <span class="pp-item">.claude/commands/</span>
+      <span class="pp-item">project-context.md</span>
+      <span class="pp-item">docs/</span>
+    </div>
+  </div>
+
+  <!-- WORKFLOW SECTION -->
+  <div class="workflow-section">
+    <div class="workflow-title">Design Workflow</div>
+
+    <div class="workflow-paths">
+
+      <!-- PRIMARY PATH -->
+      <div class="wf-path primary">
+        <div class="wf-path-label">Default Path — Single Pass</div>
+        <div class="wf-steps">
+          <div class="wf-step">
+            <div class="wf-step-num">1</div>
+            <div class="wf-step-text">
+              <strong>PRD</strong> — describe <em>what it does</em>, not how it looks
+              <div class="wf-step-note">No colors, shadows, layouts, or visual specs</div>
+            </div>
+          </div>
+          <div class="wf-arrow-step">↓</div>
+          <div class="wf-step">
+            <div class="wf-step-num">2</div>
+            <div class="wf-step-text">
+              <strong>/prepare → /architect</strong>
+              <div class="wf-step-note">Architect MUST hand off to designer unless pattern is an exact replica</div>
+            </div>
+          </div>
+          <div class="wf-arrow-step">↓</div>
+          <div class="wf-step">
+            <div class="wf-step-num">3</div>
+            <div class="wf-step-text">
+              <strong>@pact-frontend-designer</strong> — researches functional intent, brand context, design intelligence → produces complete spec
+            </div>
+          </div>
+          <div class="wf-arrow-step">↓</div>
+          <div class="wf-step">
+            <div class="wf-step-num">4</div>
+            <div class="wf-step-text">
+              <strong>@pact-frontend-coder</strong> — implements from spec
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DIVIDER -->
+      <div class="wf-divider">
+        <div class="wf-divider-label">OR</div>
+      </div>
+
+      <!-- SECONDARY PATH -->
+      <div class="wf-path secondary">
+        <div class="wf-path-label">Opt-In — Sandbox Exploration</div>
+        <div class="wf-steps">
+          <div class="wf-step">
+            <div class="wf-step-num">1</div>
+            <div class="wf-step-text">
+              <strong>"I don't know what I want yet"</strong>
+              <div class="wf-step-note">Genuinely exploring directions</div>
+            </div>
+          </div>
+          <div class="wf-arrow-step">↓</div>
+          <div class="wf-step">
+            <div class="wf-step-num">2</div>
+            <div class="wf-step-text">
+              <strong>/sandbox-design</strong> — pure aesthetics, no tech stack constraints, ui-ux-pro-max skill
+            </div>
+          </div>
+          <div class="wf-arrow-step">↓</div>
+          <div class="wf-step">
+            <div class="wf-step-num">3</div>
+            <div class="wf-step-text">
+              <strong>Pick a direction</strong> → approved mockup becomes reference
+            </div>
+          </div>
+          <div class="wf-arrow-step">↓</div>
+          <div class="wf-step">
+            <div class="wf-step-num">4</div>
+            <div class="wf-step-text">
+              Feed into <strong>Default Path</strong> step 2
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- KEY PRINCIPLE -->
+    <div class="principle">
+      <div class="principle-title">Key Principle</div>
+      <div class="principle-text">
+        The frontend designer is a <strong style="color:#e2e8f0">skilled professional</strong>, not an implementor of your visual specs.
+        Describe the <strong style="color:#e2e8f0">functional problem</strong> — let the designer research the right aesthetic solution
+        using design intelligence, brand context, and the existing design system.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">Last updated: March 23, 2026 · PACT + ui-ux-pro-max v2.2.0 + shared-skills architecture</div>
+
+</body>
+</html>
